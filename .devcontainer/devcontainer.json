@@ -1,0 +1,9 @@
+﻿{
+  "name": "THS-Monitor",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "pip install fastapi uvicorn aiohttp requests",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {"label": "THS-Monitor", "onAutoForward": "openBrowser"}
+  }
+}
