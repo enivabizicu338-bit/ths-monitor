@@ -1,0 +1,1878 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THS-Monitor 股票监控系统</title>
+<style>
+/* ===== CSS Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: #0d0d1a;
+  color: #e0e0e0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1a1a2e; }
+::-webkit-scrollbar-thumb { background: #3a3a5c; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #5a5a8c; }
+
+/* ===== Layout ===== */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ===== Header ===== */
+.header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-bottom: 1px solid #2a2a4a;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  flex-shrink: 0;
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.logo {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #00e5ff;
+  letter-spacing: 1px;
+}
+.logo span { color: #7c4dff; }
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #888;
+}
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #00c853;
+  animation: pulse 2s infinite;
+}
+.status-dot.offline { background: #ff1744; animation: none; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.header-right { display: flex; align-items: center; gap: 12px; }
+.refresh-timer {
+  font-size: 0.8rem;
+  color: #666;
+  min-width: 80px;
+  text-align: right;
+}
+.btn-refresh {
+  background: transparent;
+  border: 1px solid #3a3a5c;
+  color: #aaa;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+.btn-refresh:hover { border-color: #00e5ff; color: #00e5ff; }
+.btn-refresh:active { transform: scale(0.96); }
+
+/* ===== Tab Navigation ===== */
+.tab-nav {
+  display: flex;
+  background: #12121f;
+  border-bottom: 1px solid #2a2a4a;
+  padding: 0 16px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 12px 20px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  position: relative;
+  transition: color 0.2s;
+}
+.tab-btn:hover { color: #ccc; }
+.tab-btn.active { color: #00e5ff; }
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 20px; right: 20px;
+  height: 2px;
+  background: #00e5ff;
+  border-radius: 1px;
+}
+
+/* ===== Main Content ===== */
+.main { flex: 1; padding: 16px; overflow-y: auto; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ===== Sub Tabs ===== */
+.sub-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.sub-tab {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  color: #999;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+.sub-tab:hover { border-color: #4a4a6a; color: #ccc; }
+.sub-tab.active {
+  background: #1e3a5f;
+  border-color: #00e5ff;
+  color: #00e5ff;
+}
+
+/* ===== Cards ===== */
+.card {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a2a4a;
+}
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+.card-badge {
+  background: #2a2a4a;
+  color: #aaa;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+.card-body { padding: 0; }
+
+/* ===== Stats Grid ===== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #00e5ff;
+  line-height: 1.2;
+}
+.stat-value.green { color: #00c853; }
+.stat-value.red { color: #ff1744; }
+.stat-value.gold { color: #ffd740; }
+.stat-label {
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 4px;
+}
+
+/* ===== Tables ===== */
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+thead th {
+  background: #12121f;
+  color: #888;
+  font-weight: 500;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #1e1e32;
+  white-space: nowrap;
+}
+tbody tr { transition: background 0.15s; }
+tbody tr:hover { background: #1e1e35; }
+tbody tr.clickable { cursor: pointer; }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  margin: 1px 2px;
+  white-space: nowrap;
+}
+.tag-gold { background: rgba(255,215,64,0.15); color: #ffd740; border: 1px solid rgba(255,215,64,0.3); }
+.tag-blue { background: rgba(0,229,255,0.1); color: #00e5ff; border: 1px solid rgba(0,229,255,0.2); }
+.tag-green { background: rgba(0,200,83,0.1); color: #00c853; border: 1px solid rgba(0,200,83,0.2); }
+.tag-red { background: rgba(255,23,68,0.1); color: #ff1744; border: 1px solid rgba(255,23,68,0.2); }
+.tag-purple { background: rgba(124,77,255,0.1); color: #7c4dff; border: 1px solid rgba(124,77,255,0.2); }
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary {
+  background: linear-gradient(135deg, #00b8d4, #0091ea);
+  color: #fff;
+}
+.btn-primary:hover { background: linear-gradient(135deg, #00e5ff, #00b0ff); }
+.btn-success {
+  background: linear-gradient(135deg, #00c853, #009624);
+  color: #fff;
+}
+.btn-success:hover { background: linear-gradient(135deg, #00e676, #00c853); }
+.btn-danger {
+  background: linear-gradient(135deg, #ff1744, #d50000);
+  color: #fff;
+}
+.btn-danger:hover { background: linear-gradient(135deg, #ff5252, #ff1744); }
+.btn-sm { padding: 4px 12px; font-size: 0.8rem; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid #3a3a5c;
+  color: #aaa;
+}
+.btn-outline:hover { border-color: #00e5ff; color: #00e5ff; }
+
+/* ===== Color helpers ===== */
+.up { color: #00c853; }
+.down { color: #ff1744; }
+.flat { color: #888; }
+.text-gold { color: #ffd740; }
+.text-cyan { color: #00e5ff; }
+.text-dim { color: #666; }
+.text-muted { color: #999; }
+
+/* ===== Rank change indicators ===== */
+.rank-up::before { content: '▲ '; font-size: 0.7em; }
+.rank-down::before { content: '▼ '; font-size: 0.7em; }
+.rank-new { color: #ffd740; }
+
+/* ===== Modal ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #2a2a4a;
+  position: sticky;
+  top: 0;
+  background: #1a1a2e;
+  z-index: 1;
+}
+.modal-title { font-size: 1.1rem; font-weight: 600; }
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.modal-close:hover { color: #ff1744; }
+.modal-body { padding: 20px; }
+
+/* ===== Analysis Detail ===== */
+.analysis-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.analysis-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+}
+.analysis-code {
+  font-size: 1rem;
+  color: #888;
+  background: #12121f;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+.analysis-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.analysis-stat {
+  background: #12121f;
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+.analysis-stat-val { font-size: 1.2rem; font-weight: 600; color: #00e5ff; }
+.analysis-stat-label { font-size: 0.75rem; color: #888; margin-top: 2px; }
+
+.chart-container {
+  background: #12121f;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.chart-title {
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 12px;
+}
+canvas { display: block; width: 100%; }
+
+/* ===== Backtest ===== */
+.backtest-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.backtest-bar {
+  height: 8px;
+  background: #2a2a4a;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.backtest-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* ===== System Status ===== */
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.status-item {
+  background: #12121f;
+  border-radius: 6px;
+  padding: 16px;
+}
+.status-item-label {
+  font-size: 0.8rem;
+  color: #888;
+  margin-bottom: 6px;
+}
+.status-item-value {
+  font-size: 1.1rem;
+  color: #e0e0e0;
+}
+
+/* ===== Loading ===== */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #666;
+}
+.spinner {
+  width: 24px; height: 24px;
+  border: 2px solid #2a2a4a;
+  border-top-color: #00e5ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== Empty State ===== */
+.empty {
+  text-align: center;
+  padding: 40px;
+  color: #555;
+}
+.empty-icon { font-size: 2rem; margin-bottom: 8px; }
+
+/* ===== Toast ===== */
+.toast-container {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: #1e1e35;
+  border: 1px solid #3a3a5c;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  color: #e0e0e0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  animation: slideIn 0.3s ease;
+  max-width: 320px;
+}
+.toast.success { border-left: 3px solid #00c853; }
+.toast.error { border-left: 3px solid #ff1744; }
+.toast.info { border-left: 3px solid #00e5ff; }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .header { padding: 0 12px; height: 48px; }
+  .logo { font-size: 1.1rem; }
+  .tab-btn { padding: 10px 12px; font-size: 0.85rem; }
+  .main { padding: 10px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .analysis-stats { grid-template-columns: repeat(2, 1fr); }
+  .modal { max-width: 100%; margin: 10px; }
+  .sub-tab { padding: 4px 10px; font-size: 0.8rem; }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { padding: 10px; }
+  .stat-value { font-size: 1.4rem; }
+  .header-status span.label-text { display: none; }
+}
+
+/* ===== Plate table ===== */
+.plate-name { font-weight: 500; color: #e0e0e0; }
+
+/* ===== Recommendation reasons ===== */
+.reason-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 12px;
+  color: #444;
+  font-size: 0.75rem;
+  border-top: 1px solid #1a1a2e;
+  flex-shrink: 0;
+}
+
+/* ===== Sortable header ===== */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: #ccc; }
+th.sortable .sort-icon { margin-left: 4px; font-size: 0.7em; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">THS<span>-Monitor</span></div>
+      <div class="header-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">连接中...</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="refresh-timer" id="refreshTimer"></span>
+      <button class="btn-refresh" onclick="refreshAll()" title="手动刷新">&#x21bb; 刷新</button>
+    </div>
+  </header>
+
+  <!-- Tab Navigation -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="hotlist">&#x1F4CA; 实时热榜</button>
+    <button class="tab-btn" data-tab="recommend">&#x1F3AF; 智能推荐</button>
+    <button class="tab-btn" data-tab="analysis">&#x1F4C8; 排名分析</button>
+    <button class="tab-btn" data-tab="tracked">&#x1F3C6; 追踪列表</button>
+    <button class="tab-btn" data-tab="backtest">&#x1F52C; 回测报告</button>
+    <button class="tab-btn" data-tab="system">&#x2699; 系统状态</button>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- ====== Tab: 实时热榜 ====== -->
+    <div class="tab-content active" id="tab-hotlist">
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-subtab="normal" onclick="switchSubTab('hotlist','normal',this)">实时热榜</button>
+        <button class="sub-tab" data-subtab="skyrocket" onclick="switchSubTab('hotlist','skyrocket',this)">飙升榜</button>
+        <button class="sub-tab" data-subtab="hotday" onclick="switchSubTab('hotlist','hotday',this)">日榜</button>
+        <button class="sub-tab" data-subtab="popularity" onclick="switchSubTab('hotlist','popularity',this)">人气榜</button>
+        <button class="sub-tab" data-subtab="concept" onclick="switchSubTab('hotlist','concept',this)">概念板块</button>
+        <button class="sub-tab" data-subtab="industry" onclick="switchSubTab('hotlist','industry',this)">行业板块</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" id="hotlistTitle">实时热榜</span>
+          <span class="card-badge" id="hotlistCount">--</span>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap" id="hotlistTableWrap">
+            <div class="loading"><div class="spinner"></div>加载中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Tab: 智能推荐 ====== -->
+    <div class="tab-content" id="tab-recommend">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">智能推荐股票</span>
+          <div style="display:flex;gap:8px;">
+            <span class="card-badge" id="recommendCount">--</span>
+            <button class="btn btn-success btn-sm" onclick="saveRecommendations()">&#x1F4BE; 保存推荐</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap" id="recommendTableWrap">
+            <div class="loading"><div class="spinner"></div>加载中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Tab: 排名分析 ====== -->
+    <div class="tab-content" id="tab-analysis">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">追踪股票排名分析</span>
+          <span class="text-muted" style="font-size:0.8rem;">点击股票查看详细分析</span>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap" id="analysisTableWrap">
+            <div class="loading"><div class="spinner"></div>加载中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Tab: 追踪列表 ====== -->
+    <div class="tab-content" id="tab-tracked">
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="switchTrackedView('stocks',this)">追踪股票</button>
+        <button class="sub-tab" onclick="switchTrackedView('plates',this)">追踪板块</button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" id="trackedTitle">追踪股票</span>
+          <span class="card-badge" id="trackedCount">--</span>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap" id="trackedTableWrap">
+            <div class="loading"><div class="spinner"></div>加载中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Tab: 回测报告 ====== -->
+    <div class="tab-content" id="tab-backtest">
+      <div id="backtestContent">
+        <div class="loading"><div class="spinner"></div>加载中...</div>
+      </div>
+    </div>
+
+    <!-- ====== Tab: 系统状态 ====== -->
+    <div class="tab-content" id="tab-system">
+      <div id="systemContent">
+        <div class="loading"><div class="spinner"></div>加载中...</div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="footer">THS-Monitor v1.0 | 同花顺热度监控系统</footer>
+</div>
+
+<!-- ===== Analysis Modal ===== -->
+<div class="modal-overlay" id="analysisModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">股票分析</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="loading"><div class="spinner"></div>加载中...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Toast Container ===== -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============================================================
+// Configuration
+// ============================================================
+const API_BASE = 'http://localhost:8000';
+const REFRESH_INTERVAL = 30; // seconds
+let refreshCountdown = REFRESH_INTERVAL;
+let refreshTimer = null;
+let currentHotSubTab = 'normal';
+let currentTrackedView = 'stocks';
+let sortState = { col: null, asc: true };
+
+// ============================================================
+// Utility Functions
+// ============================================================
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return document.querySelectorAll(sel); }
+
+function formatNumber(n) {
+  if (n == null) return '--';
+  const num = parseFloat(n);
+  if (isNaN(num)) return '--';
+  if (num >= 10000) return (num / 10000).toFixed(1) + '万';
+  return num.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+}
+
+function formatPct(v) {
+  if (v == null || v === '' || v === undefined) return '--';
+  const num = parseFloat(v);
+  if (isNaN(num)) return '--';
+  const sign = num > 0 ? '+' : '';
+  return sign + num.toFixed(2) + '%';
+}
+
+function pctClass(v) {
+  if (v == null || v === '' || v === undefined) return 'flat';
+  const num = parseFloat(v);
+  if (isNaN(num) || num === 0) return 'flat';
+  return num > 0 ? 'up' : 'down';
+}
+
+function rankChangeClass(v) {
+  if (v == null || v === '' || v === undefined) return '';
+  const num = parseFloat(v);
+  if (isNaN(num) || num === 0) return 'flat';
+  return num > 0 ? 'up rank-up' : 'down rank-down';
+}
+
+function formatRankChange(v) {
+  if (v == null || v === '' || v === undefined) return '--';
+  const num = parseFloat(v);
+  if (isNaN(num)) return '--';
+  if (num === 0) return '0';
+  return (num > 0 ? '+' : '') + num;
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return '--';
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch(e) { return ts; }
+}
+
+function formatTime(ts) {
+  if (!ts) return '--';
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch(e) { return ts; }
+}
+
+function getMarketPrefix(market) {
+  if (market === 17) return 'SH';
+  if (market === 33) return 'SZ';
+  return '';
+}
+
+function stockCodeDisplay(code, market) {
+  const prefix = getMarketPrefix(market);
+  return prefix ? `${prefix}${code}` : code;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// Toast Notifications
+// ============================================================
+function showToast(msg, type = 'info') {
+  const container = $('#toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    toast.style.transition = 'all 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ============================================================
+// API Calls
+// ============================================================
+async function apiGet(path) {
+  try {
+    const resp = await fetch(`${API_BASE}${path}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch(e) {
+    console.error(`API GET ${path} failed:`, e);
+    return null;
+  }
+}
+
+async function apiPost(path) {
+  try {
+    const resp = await fetch(`${API_BASE}${path}`, { method: 'POST' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch(e) {
+    console.error(`API POST ${path} failed:`, e);
+    return null;
+  }
+}
+
+// ============================================================
+// Tab Navigation
+// ============================================================
+$$('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    $$('.tab-content').forEach(c => c.classList.remove('active'));
+    $(`#tab-${btn.dataset.tab}`).classList.add('active');
+    // Load data for the tab
+    loadTabData(btn.dataset.tab);
+  });
+});
+
+function switchSubTab(tab, sub, btn) {
+  const container = $(`#tab-${tab}`);
+  container.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (tab === 'hotlist') {
+    currentHotSubTab = sub;
+    loadHotList();
+  }
+}
+
+function switchTrackedView(view, btn) {
+  const container = $('#tab-tracked');
+  container.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentTrackedView = view;
+  loadTracked();
+}
+
+function loadTabData(tab) {
+  switch(tab) {
+    case 'hotlist': loadHotList(); break;
+    case 'recommend': loadRecommendations(); break;
+    case 'analysis': loadAnalysisList(); break;
+    case 'tracked': loadTracked(); break;
+    case 'backtest': loadBacktest(); break;
+    case 'system': loadSystemStatus(); break;
+  }
+}
+
+// ============================================================
+// Hot List
+// ============================================================
+// 全局变量存储当前热榜数据和排序状态
+let hotListData = [];
+let hotListSort = { col: 'order', asc: true };
+
+async function loadHotList() {
+  const wrap = $('#hotlistTableWrap');
+  const titleEl = $('#hotlistTitle');
+  const countEl = $('#hotlistCount');
+
+  const titles = {
+    normal: '实时热榜', skyrocket: '飙升榜', hotday: '日榜',
+    popularity: '人气榜', concept: '概念板块热榜', industry: '行业板块热榜'
+  };
+  titleEl.textContent = titles[currentHotSubTab] || '热榜';
+
+  // 同时获取当前榜单和人气榜（用于股价）
+  let data, popData;
+  if (currentHotSubTab === 'concept') {
+    data = await apiGet('/api/plates/concept');
+  } else if (currentHotSubTab === 'industry') {
+    data = await apiGet('/api/plates/industry');
+  } else if (currentHotSubTab === 'popularity') {
+    data = await apiGet('/api/popularity');
+  } else if (currentHotSubTab === 'skyrocket') {
+    [data, popData] = await Promise.all([apiGet('/api/hot/skyrocket'), apiGet('/api/popularity')]);
+  } else if (currentHotSubTab === 'hotday') {
+    [data, popData] = await Promise.all([apiGet('/api/hot_day'), apiGet('/api/popularity')]);
+  } else {
+    [data, popData] = await Promise.all([apiGet('/api/hot/normal'), apiGet('/api/popularity')]);
+  }
+
+  if (!data || !data.success) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">&#x26A0;</div>暂无数据或服务未连接</div>';
+    countEl.textContent = '0';
+    return;
+  }
+
+  // Plate lists
+  if (currentHotSubTab === 'concept' || currentHotSubTab === 'industry') {
+    const plates = data.plates || [];
+    countEl.textContent = data.count || plates.length;
+    if (plates.length === 0) {
+      wrap.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F4CA;</div>暂无板块数据</div>';
+      return;
+    }
+    hotListData = plates;
+    renderHotListTable();
+    return;
+  }
+
+  // Stock lists - 合并股价数据
+  let stocks = data.stocks || [];
+  
+  // 如果不是人气榜，从人气榜获取股价
+  if (currentHotSubTab !== 'popularity' && popData && popData.success) {
+    const priceMap = {};
+    popData.stocks.forEach(s => {
+      priceMap[s.code] = s.price;
+    });
+    stocks = stocks.map(s => ({
+      ...s,
+      price: priceMap[s.code] || '-'
+    }));
+  }
+  
+  hotListData = stocks;
+  countEl.textContent = data.count || stocks.length;
+  
+  if (stocks.length === 0) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F4CA;</div>暂无数据</div>';
+    return;
+  }
+  
+  renderHotListTable();
+}
+
+function sortHotList(col) {
+  if (hotListSort.col === col) {
+    hotListSort.asc = !hotListSort.asc;
+  } else {
+    hotListSort.col = col;
+    hotListSort.asc = true;
+  }
+  
+  hotListData.sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (typeof va === 'string') va = parseFloat(va) || va;
+    if (typeof vb === 'string') vb = parseFloat(vb) || vb;
+    if (va < vb) return hotListSort.asc ? -1 : 1;
+    if (va > vb) return hotListSort.asc ? 1 : -1;
+    return 0;
+  });
+  
+  renderHotListTable();
+}
+
+function renderHotListTable() {
+  const wrap = $('#hotlistTableWrap');
+  const isPlate = currentHotSubTab === 'concept' || currentHotSubTab === 'industry';
+  
+  if (isPlate) {
+    // 板块列表
+    let html = `<table>
+      <thead><tr>
+        <th class="sortable" onclick="sortHotList('order')">排名 ${sortIcon('order')}</th>
+        <th class="sortable" onclick="sortHotList('name')">板块名称 ${sortIcon('name')}</th>
+        <th class="sortable" onclick="sortHotList('rate')">涨跌幅 ${sortIcon('rate')}</th>
+        <th>热度标签</th>
+      </tr></thead><tbody>`;
+    hotListData.forEach((p, i) => {
+      const pctC = pctClass(p.rate);
+      html += `<tr>
+        <td>${escapeHtml(p.order != null ? p.order : i+1)}</td>
+        <td class="plate-name">${escapeHtml(p.name)}</td>
+        <td class="${pctC}">${formatPct(p.rate)}</td>
+        <td>${p.hot_tag ? `<span class="tag tag-gold">${escapeHtml(p.hot_tag)}</span>` : ''}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    return;
+  }
+  
+  // 股票列表
+  const sortIconHtml = (col) => hotListSort.col === col ? (hotListSort.asc ? '▲' : '▼') : '';
+  let html = `<table>
+    <thead><tr>
+      <th class="sortable" onclick="sortHotList('order')">排名 ${sortIconHtml('order')}</th>
+      <th class="sortable" onclick="sortHotList('name')">名称 ${sortIconHtml('name')}</th>
+      <th class="sortable" onclick="sortHotList('price')">股价 ${sortIconHtml('price')}</th>
+      <th class="sortable" onclick="sortHotList('rate')">热度 ${sortIconHtml('rate')}</th>
+      <th class="sortable" onclick="sortHotList('rise_and_fall')">涨跌幅 ${sortIconHtml('rise_and_fall')}</th>
+      <th class="sortable" onclick="sortHotList('hot_rank_chg')">排名变动 ${sortIconHtml('hot_rank_chg')}</th>
+      <th>标签</th>
+    </tr></thead><tbody>`;
+  
+  hotListData.forEach((s, i) => {
+    const pctC = pctClass(s.rise_and_fall || s.change);
+    const chgC = rankChangeClass(s.hot_rank_chg);
+    const tags = [];
+    if (s.tag) {
+      if (s.tag.popularity_tag) tags.push(`<span class="tag tag-gold">${escapeHtml(s.tag.popularity_tag)}</span>`);
+      if (s.tag.concept_tag && Array.isArray(s.tag.concept_tag)) {
+        s.tag.concept_tag.forEach(c => tags.push(`<span class="tag tag-blue">${escapeHtml(c)}</span>`));
+      }
+    }
+    const baiduUrl = `https://finance.baidu.com/stock/ab-${escapeHtml(s.code)}`;
+    const nameLink = `<a href="${baiduUrl}" target="_blank" style="color:#00e5ff;text-decoration:none;font-weight:500;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${escapeHtml(s.name)}</a>`;
+    
+    html += `<tr class="clickable" onclick="openStockAnalysis('${escapeHtml(s.code)}','${escapeHtml(s.name)}',${s.market || s.market_id || 0})">
+      <td>${escapeHtml(s.order != null ? s.order : (s.hot_rank || i+1))}</td>
+      <td>${nameLink}</td>
+      <td style="color:#e0e0e0;">${escapeHtml(s.price || '-')}</td>
+      <td class="text-cyan">${formatNumber(s.rate || s.hot_rank)}</td>
+      <td class="${pctC}" style="font-weight:600;">${formatPct(s.rise_and_fall || s.change)}</td>
+      <td class="${chgC}">${formatRankChange(s.hot_rank_chg)}</td>
+      <td>${tags.join('')}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function sortIcon(col) {
+  return hotListSort.col === col ? (hotListSort.asc ? '▲' : '▼') : '';
+}
+
+// ============================================================
+// Recommendations
+// ============================================================
+let recData = [];
+let recSort = { col: 'score', asc: false };
+
+async function loadRecommendations() {
+  const wrap = $('#recommendTableWrap');
+  const countEl = $('#recommendCount');
+  
+  // 同时获取推荐和人气榜（用于股价）
+  const [data, popData] = await Promise.all([
+    apiGet('/api/recommendations'),
+    apiGet('/api/popularity')
+  ]);
+
+  if (!data || !data.success) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F3AF;</div>暂无推荐数据</div>';
+    countEl.textContent = '0';
+    return;
+  }
+
+  let recs = data.recommendations || [];
+  
+  // 合并股价数据
+  if (popData && popData.success) {
+    const priceMap = {};
+    popData.stocks.forEach(s => {
+      priceMap[s.code] = s.price;
+    });
+    recs = recs.map(r => ({
+      ...r,
+      price: priceMap[r.code] || '-'
+    }));
+  }
+  
+  recData = recs;
+  countEl.textContent = data.count || recs.length;
+
+  if (recs.length === 0) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F3AF;</div>暂无推荐数据</div>';
+    return;
+  }
+
+  renderRecommendationsTable();
+}
+
+function sortRecommendations(col) {
+  if (recSort.col === col) {
+    recSort.asc = !recSort.asc;
+  } else {
+    recSort.col = col;
+    recSort.asc = true;
+  }
+  
+  recData.sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (typeof va === 'string') va = parseFloat(va) || va;
+    if (typeof vb === 'string') vb = parseFloat(vb) || vb;
+    if (va < vb) return recSort.asc ? -1 : 1;
+    if (va > vb) return recSort.asc ? 1 : -1;
+    return 0;
+  });
+  
+  renderRecommendationsTable();
+}
+
+function renderRecommendationsTable() {
+  const wrap = $('#recommendTableWrap');
+  const sortIcon = (col) => recSort.col === col ? (recSort.asc ? '▲' : '▼') : '';
+  
+  let html = `<table>
+    <thead><tr>
+      <th class="sortable" onclick="sortRecommendations('rank')">排名 ${sortIcon('rank')}</th>
+      <th class="sortable" onclick="sortRecommendations('name')">名称 ${sortIcon('name')}</th>
+      <th class="sortable" onclick="sortRecommendations('price')">股价 ${sortIcon('price')}</th>
+      <th class="sortable" onclick="sortRecommendations('score')">评分 ${sortIcon('score')}</th>
+      <th class="sortable" onclick="sortRecommendations('heat')">热度 ${sortIcon('heat')}</th>
+      <th class="sortable" onclick="sortRecommendations('change_pct')">涨跌幅 ${sortIcon('change_pct')}</th>
+      <th class="sortable" onclick="sortRecommendations('rank_change')">排名变动 ${sortIcon('rank_change')}</th>
+      <th>推荐理由</th>
+      <th>概念</th>
+    </tr></thead><tbody>`;
+  
+  recData.forEach((r, i) => {
+    const pctC = pctClass(r.change_pct);
+    const chgC = rankChangeClass(r.rank_change);
+    const scoreColor = r.score >= 80 ? 'up' : r.score >= 60 ? 'text-gold' : 'text-muted';
+    const reasons = (r.reasons || []).map(re => `<span class="tag tag-purple">${escapeHtml(re)}</span>`).join('');
+    const concepts = (r.concepts || []).slice(0, 3).map(c => `<span class="tag tag-blue">${escapeHtml(c)}</span>`).join('');
+    const baiduUrl = `https://finance.baidu.com/stock/ab-${escapeHtml(r.code)}`;
+    const nameLink = `<a href="${baiduUrl}" target="_blank" style="color:#00e5ff;text-decoration:none;font-weight:500;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${escapeHtml(r.name)}</a>`;
+    
+    html += `<tr class="clickable" onclick="openStockAnalysis('${escapeHtml(r.code)}','${escapeHtml(r.name)}',0)">
+      <td>${escapeHtml(r.rank != null ? r.rank : i+1)}</td>
+      <td>${nameLink}</td>
+      <td style="color:#e0e0e0;">${escapeHtml(r.price || '-')}</td>
+      <td class="${scoreColor}" style="font-weight:700;font-size:1.05rem;">${r.score != null ? r.score : '--'}</td>
+      <td class="text-cyan">${formatNumber(r.heat)}</td>
+      <td class="${pctC}" style="font-weight:600;">${formatPct(r.change_pct)}</td>
+      <td class="${chgC}">${formatRankChange(r.rank_change)}</td>
+      <td><div class="reason-list">${reasons}</div></td>
+      <td>${concepts}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+async function saveRecommendations() {
+  showToast('正在保存推荐...', 'info');
+  const data = await apiPost('/api/recommendations/save');
+  if (data && data.success !== false) {
+    showToast('推荐已保存，可用于回测', 'success');
+  } else {
+    showToast('保存失败: ' + (data?.message || '未知错误'), 'error');
+  }
+}
+
+// ============================================================
+// Analysis List (uses tracked data for click-through)
+// ============================================================
+async function loadAnalysisList() {
+  const wrap = $('#analysisTableWrap');
+  const data = await apiGet('/api/tracked');
+
+  if (!data || !data.stocks || data.stocks.length === 0) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F4C8;</div>暂无追踪股票，请先在系统运行一段时间后查看</div>';
+    return;
+  }
+
+  const stocks = data.stocks;
+  let html = `<table>
+    <thead><tr>
+      <th>代码</th><th>名称</th><th>首次发现</th><th>最近出现</th><th>快照数</th><th>最佳排名</th><th>平均排名</th><th>最高热度</th><th>概念标签</th>
+    </tr></thead><tbody>`;
+  stocks.forEach(s => {
+    const concepts = (s.concept_tags || []).slice(0, 3).map(c => `<span class="tag tag-blue">${escapeHtml(c)}</span>`).join('');
+    html += `<tr class="clickable" onclick="openStockAnalysis('${escapeHtml(s.code)}','${escapeHtml(s.name)}',0)">
+      <td class="text-muted">${escapeHtml(s.code)}</td>
+      <td style="font-weight:500;color:#e0e0e0;">${escapeHtml(s.name)}</td>
+      <td class="text-muted">${formatTime(s.first_seen_ts)}</td>
+      <td class="text-muted">${formatTime(s.last_seen_ts)}</td>
+      <td class="text-cyan">${s.total_snapshots || 0}</td>
+      <td class="up" style="font-weight:600;">${s.best_rank || '--'}</td>
+      <td>${s.avg_rank != null ? parseFloat(s.avg_rank).toFixed(1) : '--'}</td>
+      <td class="text-gold">${formatNumber(s.max_heat_score)}</td>
+      <td>${concepts}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// ============================================================
+// Tracked Stocks / Plates
+// ============================================================
+async function loadTracked() {
+  const wrap = $('#trackedTableWrap');
+  const titleEl = $('#trackedTitle');
+  const countEl = $('#trackedCount');
+
+  if (currentTrackedView === 'plates') {
+    titleEl.textContent = '追踪板块';
+    const data = await apiGet('/api/plates/tracked');
+    if (!data || !data.plates || data.plates.length === 0) {
+      wrap.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F3C6;</div>暂无追踪板块</div>';
+      countEl.textContent = '0';
+      return;
+    }
+    countEl.textContent = data.total || data.plates.length;
+    let html = `<table>
+      <thead><tr>
+        <th>板块代码</th><th>板块名称</th><th>板块类型</th><th>快照数</th><th>最佳排名</th><th>热度标签</th>
+      </tr></thead><tbody>`;
+    data.plates.forEach(p => {
+      html += `<tr>
+        <td class="text-muted">${escapeHtml(p.code)}</td>
+        <td class="plate-name">${escapeHtml(p.name)}</td>
+        <td><span class="tag tag-purple">${escapeHtml(p.plate_type || '--')}</span></td>
+        <td class="text-cyan">${p.total_snapshots || 0}</td>
+        <td class="up" style="font-weight:600;">${p.best_rank || '--'}</td>
+        <td>${p.hot_tag ? `<span class="tag tag-gold">${escapeHtml(p.hot_tag)}</span>` : ''}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    return;
+  }
+
+  // Stocks
+  titleEl.textContent = '追踪股票';
+  const [data, popData] = await Promise.all([
+    apiGet('/api/tracked'),
+    apiGet('/api/popularity')
+  ]);
+  
+  if (!data || !data.stocks || data.stocks.length === 0) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">&#x1F3C6;</div>暂无追踪股票</div>';
+    countEl.textContent = '0';
+    return;
+  }
+  
+  let stocks = data.stocks;
+  
+  // 合并股价数据
+  if (popData && popData.success) {
+    const priceMap = {};
+    popData.stocks.forEach(s => {
+      priceMap[s.code] = s.price;
+    });
+    stocks = stocks.map(s => ({
+      ...s,
+      price: priceMap[s.code] || '-'
+    }));
+  }
+  
+  trackedStocksCache = stocks;
+  countEl.textContent = data.total || stocks.length;
+  
+  renderTrackedTable();
+}
+
+function renderTrackedTable() {
+  const wrap = $('#trackedTableWrap');
+  const sortIcon = (col) => sortState.col === col ? (sortState.asc ? '▲' : '▼') : '';
+  
+  let html = `<table>
+    <thead><tr>
+      <th class="sortable" onclick="sortTracked('name')">名称 ${sortIcon('name')}</th>
+      <th class="sortable" onclick="sortTracked('price')">股价 ${sortIcon('price')}</th>
+      <th class="sortable" onclick="sortTracked('first_seen_ts')">首次发现 ${sortIcon('first_seen_ts')}</th>
+      <th class="sortable" onclick="sortTracked('last_seen_ts')">最近出现 ${sortIcon('last_seen_ts')}</th>
+      <th class="sortable" onclick="sortTracked('total_snapshots')">快照数 ${sortIcon('total_snapshots')}</th>
+      <th class="sortable" onclick="sortTracked('best_rank')">最佳排名 ${sortIcon('best_rank')}</th>
+      <th class="sortable" onclick="sortTracked('avg_rank')">平均排名 ${sortIcon('avg_rank')}</th>
+      <th class="sortable" onclick="sortTracked('max_heat_score')">最高热度 ${sortIcon('max_heat_score')}</th>
+      <th>概念标签</th>
+    </tr></thead><tbody id="trackedBody">`;
+  
+  trackedStocksCache.forEach(s => {
+    // concept_tags可能是JSON字符串或数组
+    let conceptList = s.concept_tags || [];
+    if (typeof conceptList === 'string') {
+      try { conceptList = JSON.parse(conceptList); } catch { conceptList = []; }
+    }
+    const concepts = conceptList.slice(0, 3).map(c => `<span class="tag tag-blue">${escapeHtml(c)}</span>`).join('');
+    const baiduUrl = `https://finance.baidu.com/stock/ab-${escapeHtml(s.code)}`;
+    const nameLink = `<a href="${baiduUrl}" target="_blank" style="color:#00e5ff;text-decoration:none;font-weight:500;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${escapeHtml(s.name)}</a>`;
+    
+    html += `<tr class="clickable" onclick="openStockAnalysis('${escapeHtml(s.code)}','${escapeHtml(s.name)}',0)">
+      <td>${nameLink}</td>
+      <td style="color:#e0e0e0;">${escapeHtml(s.price || '-')}</td>
+      <td class="text-muted">${formatTime(s.first_seen_ts)}</td>
+      <td class="text-muted">${formatTime(s.last_seen_ts)}</td>
+      <td class="text-cyan">${s.total_snapshots || 0}</td>
+      <td class="up" style="font-weight:600;">${s.best_rank || '--'}</td>
+      <td>${s.avg_rank != null ? parseFloat(s.avg_rank).toFixed(1) : '--'}</td>
+      <td class="text-gold">${formatNumber(s.max_heat_score)}</td>
+      <td>${concepts}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+let trackedStocksCache = [];
+function sortTracked(col) {
+  if (sortState.col === col) {
+    sortState.asc = !sortState.asc;
+  } else {
+    sortState.col = col;
+    sortState.asc = true;
+  }
+  
+  trackedStocksCache.sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (typeof va === 'string') va = parseFloat(va) || va;
+    if (typeof vb === 'string') vb = parseFloat(vb) || vb;
+    if (va < vb) return sortState.asc ? -1 : 1;
+    if (va > vb) return sortState.asc ? 1 : -1;
+    return 0;
+  });
+  
+  renderTrackedTable();
+}
+
+// ============================================================
+// Backtest
+// ============================================================
+async function loadBacktest() {
+  const container = $('#backtestContent');
+  const data = await apiGet('/api/backtest');
+
+  if (!data) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">&#x26A0;</div>无法获取回测数据</div>';
+    return;
+  }
+
+  const total = data.total || 0;
+  const success = data.success || 0;
+  const fail = data.fail || 0;
+  const pending = data.pending || 0;
+  const rate = data.success_rate || 0;
+
+  let html = `
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">${total}</div>
+        <div class="stat-label">总推荐数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value green">${success}</div>
+        <div class="stat-label">成功</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value red">${fail}</div>
+        <div class="stat-label">失败</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value gold">${pending}</div>
+        <div class="stat-label">待验证</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value ${rate >= 50 ? 'green' : 'red'}">${rate.toFixed(1)}%</div>
+        <div class="stat-label">成功率</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">成功率</span></div>
+      <div class="card-body" style="padding:16px;">
+        <div class="backtest-bar">
+          <div class="backtest-bar-fill" style="width:${rate}%;background:linear-gradient(90deg,#00c853,#00e676);"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.8rem;color:#888;">
+          <span>失败 ${fail}</span><span>成功 ${success}</span>
+        </div>
+      </div>
+    </div>`;
+
+  // By type breakdown
+  if (data.by_type && Object.keys(data.by_type).length > 0) {
+    html += `<div class="card">
+      <div class="card-header"><span class="card-title">按类型统计</span></div>
+      <div class="card-body"><div class="table-wrap"><table>
+        <thead><tr><th>类型</th><th>总数</th><th>成功</th><th>失败</th><th>成功率</th></tr></thead><tbody>`;
+    for (const [type, v] of Object.entries(data.by_type)) {
+      const t = v.total || 0;
+      const s = v.success || 0;
+      const f = v.fail || 0;
+      const r = t > 0 ? ((s / t) * 100).toFixed(1) : '0.0';
+      html += `<tr>
+        <td><span class="tag tag-purple">${escapeHtml(type)}</span></td>
+        <td>${t}</td><td class="up">${s}</td><td class="down">${f}</td>
+        <td class="${parseFloat(r) >= 50 ? 'up' : 'down'}">${r}%</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div></div></div>';
+  }
+
+  // By reason breakdown
+  if (data.by_reason && Object.keys(data.by_reason).length > 0) {
+    html += `<div class="card">
+      <div class="card-header"><span class="card-title">按推荐理由统计</span></div>
+      <div class="card-body"><div class="table-wrap"><table>
+        <thead><tr><th>推荐理由</th><th>总数</th><th>成功</th><th>失败</th><th>成功率</th></tr></thead><tbody>`;
+    for (const [reason, v] of Object.entries(data.by_reason)) {
+      const t = v.total || 0;
+      const s = v.success || 0;
+      const f = v.fail || 0;
+      const r = t > 0 ? ((s / t) * 100).toFixed(1) : '0.0';
+      html += `<tr>
+        <td><span class="tag tag-gold">${escapeHtml(reason)}</span></td>
+        <td>${t}</td><td class="up">${s}</td><td class="down">${f}</td>
+        <td class="${parseFloat(r) >= 50 ? 'up' : 'down'}">${r}%</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div></div></div>';
+  }
+
+  container.innerHTML = html;
+}
+
+// ============================================================
+// System Status
+// ============================================================
+async function loadSystemStatus() {
+  const container = $('#systemContent');
+  const [statusData, autoData] = await Promise.all([
+    apiGet('/api/status'),
+    apiGet('/api/auto_collect/status')
+  ]);
+
+  let html = '<div class="status-grid">';
+
+  if (statusData) {
+    const items = [
+      { label: '总快照数', value: formatNumber(statusData.total_snapshots) },
+      { label: '追踪股票数', value: statusData.tracked_stocks || 0 },
+      { label: '追踪板块数', value: statusData.tracked_plates || 0 },
+      { label: '最近快照时间', value: formatTimestamp(statusData.last_snapshot) },
+    ];
+    items.forEach(item => {
+      html += `<div class="status-item">
+        <div class="status-item-label">${item.label}</div>
+        <div class="status-item-value">${item.value}</div>
+      </div>`;
+    });
+  }
+
+  if (autoData) {
+    const isRunning = autoData.running;
+    const isTrading = autoData.is_trading_hours;
+    html += `<div class="status-item">
+      <div class="status-item-label">自动采集状态</div>
+      <div class="status-item-value" style="color:${isRunning ? '#00c853' : '#ff1744'}">
+        ${isRunning ? '&#x2713; 运行中' : '&#x2717; 已停止'}
+      </div>
+    </div>`;
+    html += `<div class="status-item">
+      <div class="status-item-label">采集间隔</div>
+      <div class="status-item-value">${autoData.interval_seconds || '--'} 秒</div>
+    </div>`;
+    html += `<div class="status-item">
+      <div class="status-item-label">交易时段</div>
+      <div class="status-item-value" style="color:${isTrading ? '#00c853' : '#888'}">
+        ${isTrading ? '&#x2713; 交易中' : '&#x2717; 非交易时段'}
+      </div>
+    </div>`;
+    html += `<div class="status-item">
+      <div class="status-item-label">服务器时间</div>
+      <div class="status-item-value">${formatTimestamp(autoData.current_time)}</div>
+    </div>`;
+  }
+
+  html += '</div>';
+
+  html += `<div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="manualCollect()">&#x1F504; 手动采集数据</button>
+    <button class="btn btn-outline" onclick="refreshAll()">&#x21bb; 刷新状态</button>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
+async function manualCollect() {
+  showToast('正在触发数据采集...', 'info');
+  const data = await apiPost('/api/collect');
+  if (data && data.success !== false) {
+    showToast('数据采集完成', 'success');
+    setTimeout(() => refreshAll(), 1000);
+  } else {
+    showToast('采集失败: ' + (data?.message || '未知错误'), 'error');
+  }
+}
+
+// ============================================================
+// Stock Analysis Modal
+// ============================================================
+async function openStockAnalysis(code, name, market) {
+  const modal = $('#analysisModal');
+  const title = $('#modalTitle');
+  const body = $('#modalBody');
+
+  title.textContent = `${name} (${code})`;
+  body.innerHTML = '<div class="loading"><div class="spinner"></div>加载分析数据...</div>';
+  modal.classList.add('show');
+
+  const [analysisData, historyData] = await Promise.all([
+    apiGet(`/api/analysis/${code}`),
+    apiGet(`/api/history/${code}`)
+  ]);
+
+  if (!analysisData && !historyData) {
+    body.innerHTML = '<div class="empty"><div class="empty-icon">&#x26A0;</div>无法获取分析数据</div>';
+    return;
+  }
+
+  let html = '';
+
+  // Analysis header
+  if (analysisData) {
+    html += `<div class="analysis-header">
+      <span class="analysis-name">${escapeHtml(analysisData.name || name)}</span>
+      <span class="analysis-code">${escapeHtml(code)}</span>
+      ${analysisData.found !== false ? '<span class="tag tag-green">已追踪</span>' : '<span class="tag tag-red">未追踪</span>'}
+    </div>`;
+
+    html += '<div class="analysis-stats">';
+    const stats = [
+      { label: '首次上榜', value: formatTime(analysisData.first_seen) },
+      { label: '最近上榜', value: formatTime(analysisData.last_seen) },
+      { label: '上榜小时数', value: analysisData.hours_on_board || 0 },
+      { label: '上榜天数', value: analysisData.days_on_board || 0 },
+      { label: '总快照数', value: analysisData.total_snapshots || 0 },
+      { label: '最佳排名', value: analysisData.best_rank || '--' },
+      { label: '平均排名', value: analysisData.avg_rank != null ? parseFloat(analysisData.avg_rank).toFixed(1) : '--' },
+      { label: '最高热度', value: formatNumber(analysisData.max_heat) },
+    ];
+    stats.forEach(s => {
+      html += `<div class="analysis-stat">
+        <div class="analysis-stat-val">${s.value}</div>
+        <div class="analysis-stat-label">${s.label}</div>
+      </div>`;
+    });
+    html += '</div>';
+
+    // Concepts
+    if (analysisData.concepts && analysisData.concepts.length > 0) {
+      html += '<div style="margin-bottom:16px;"><span class="text-muted" style="font-size:0.8rem;">关联概念: </span>';
+      analysisData.concepts.forEach(c => {
+        html += `<span class="tag tag-blue">${escapeHtml(c)}</span>`;
+      });
+      html += '</div>';
+    }
+
+    // Same plate count
+    if (analysisData.same_plate_count && Object.keys(analysisData.same_plate_count).length > 0) {
+      html += '<div style="margin-bottom:16px;"><span class="text-muted" style="font-size:0.8rem;">同板块股票数: </span>';
+      for (const [plate, count] of Object.entries(analysisData.same_plate_count)) {
+        html += `<span class="tag tag-purple">${escapeHtml(plate)}: ${count}</span>`;
+      }
+      html += '</div>';
+    }
+  }
+
+  // Rank Trend Chart
+  const trendData = analysisData?.rank_trend || historyData?.records || [];
+  if (trendData.length > 0) {
+    html += '<div class="chart-container">';
+    html += '<div class="chart-title">排名趋势 (排名越低越好)</div>';
+    html += '<canvas id="rankTrendCanvas" height="280"></canvas>';
+    html += '</div>';
+
+    // Heat trend chart
+    html += '<div class="chart-container">';
+    html += '<div class="chart-title">热度趋势</div>';
+    html += '<canvas id="heatTrendCanvas" height="200"></canvas>';
+    html += '</div>';
+
+    // History table
+    html += `<div class="card" style="margin-top:16px;">
+      <div class="card-header">
+        <span class="card-title">历史记录</span>
+        <span class="card-badge">${trendData.length} 条</span>
+      </div>
+      <div class="card-body"><div class="table-wrap"><table>
+        <thead><tr><th>时间</th><th>排名</th><th>热度</th><th>涨跌幅</th><th>排名变动</th><th>标签</th></tr></thead><tbody>`;
+    trendData.forEach(r => {
+      const pctC = pctClass(r.pct || r.change_pct);
+      const chgC = rankChangeClass(r.chg || r.rank_change);
+      const tag = r.popularity_tag || '';
+      html += `<tr>
+        <td class="text-muted">${formatTime(r.ts)}</td>
+        <td class="up" style="font-weight:600;">${r.rank || r.rank_order || '--'}</td>
+        <td class="text-cyan">${formatNumber(r.heat || r.heat_score)}</td>
+        <td class="${pctC}">${formatPct(r.pct || r.change_pct)}</td>
+        <td class="${chgC}">${formatRankChange(r.chg || r.rank_change)}</td>
+        <td>${tag ? `<span class="tag tag-gold">${escapeHtml(tag)}</span>` : ''}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div></div></div>';
+  } else {
+    html += '<div class="empty"><div class="empty-icon">&#x1F4C8;</div>暂无排名趋势数据</div>';
+  }
+
+  body.innerHTML = html;
+
+  // Draw charts after DOM update
+  if (trendData.length > 0) {
+    requestAnimationFrame(() => {
+      drawRankChart(trendData);
+      drawHeatChart(trendData);
+    });
+  }
+}
+
+function closeModal() {
+  $('#analysisModal').classList.remove('show');
+}
+
+// Close modal on overlay click
+$('#analysisModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ============================================================
+// Canvas Charts
+// ============================================================
+function drawRankChart(data) {
+  const canvas = document.getElementById('rankTrendCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // High DPI support
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 280 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width;
+  const H = 280;
+
+  const pad = { top: 20, right: 60, bottom: 40, left: 60 };
+  const chartW = W - pad.left - pad.right;
+  const chartH = H - pad.top - pad.bottom;
+
+  // Extract data
+  const points = data.map(d => ({
+    ts: d.ts,
+    rank: parseFloat(d.rank || d.rank_order) || 0,
+    heat: parseFloat(d.heat || d.heat_score) || 0,
+    pct: parseFloat(d.pct || d.change_pct) || 0,
+  })).filter(p => p.rank > 0);
+
+  if (points.length === 0) return;
+
+  // Rank chart: invert Y axis (lower rank = higher on chart)
+  const ranks = points.map(p => p.rank);
+  const minRank = Math.max(1, Math.min(...ranks) - 5);
+  const maxRank = Math.max(...ranks) + 5;
+
+  // Clear
+  ctx.fillStyle = '#12121f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = '#2a2a4a';
+  ctx.lineWidth = 0.5;
+  const rankStep = Math.max(1, Math.ceil((maxRank - minRank) / 5));
+  for (let r = Math.ceil(minRank); r <= maxRank; r += rankStep) {
+    const y = pad.top + (1 - (r - minRank) / (maxRank - minRank)) * chartH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = '#666';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(r, pad.left - 8, y + 4);
+  }
+
+  // X axis labels
+  ctx.textAlign = 'center';
+  const labelStep = Math.max(1, Math.floor(points.length / 6));
+  points.forEach((p, i) => {
+    if (i % labelStep === 0 || i === points.length - 1) {
+      const x = pad.left + (i / Math.max(1, points.length - 1)) * chartW;
+      ctx.fillStyle = '#666';
+      ctx.font = '10px monospace';
+      ctx.fillText(formatTime(p.ts), x, H - pad.bottom + 16);
+    }
+  });
+
+  // Draw rank line
+  ctx.beginPath();
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  points.forEach((p, i) => {
+    const x = pad.left + (i / Math.max(1, points.length - 1)) * chartW;
+    const y = pad.top + (1 - (p.rank - minRank) / (maxRank - minRank)) * chartH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Gradient fill under line
+  const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
+  gradient.addColorStop(0, 'rgba(0,229,255,0.15)');
+  gradient.addColorStop(1, 'rgba(0,229,255,0.01)');
+  ctx.lineTo(pad.left + chartW, pad.top + chartH);
+  ctx.lineTo(pad.left, pad.top + chartH);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Draw dots
+  points.forEach((p, i) => {
+    const x = pad.left + (i / Math.max(1, points.length - 1)) * chartW;
+    const y = pad.top + (1 - (p.rank - minRank) / (maxRank - minRank)) * chartH;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = p.pct >= 0 ? '#00c853' : '#ff1744';
+    ctx.fill();
+  });
+
+  // Y axis label
+  ctx.save();
+  ctx.translate(14, pad.top + chartH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#888';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('排名', 0, 0);
+  ctx.restore();
+}
+
+function drawHeatChart(data) {
+  const canvas = document.getElementById('heatTrendCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 200 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width;
+  const H = 200;
+
+  const pad = { top: 20, right: 60, bottom: 40, left: 60 };
+  const chartW = W - pad.left - pad.right;
+  const chartH = H - pad.top - pad.bottom;
+
+  const points = data.map(d => ({
+    ts: d.ts,
+    heat: parseFloat(d.heat || d.heat_score) || 0,
+  })).filter(p => p.heat > 0);
+
+  if (points.length === 0) return;
+
+  const heats = points.map(p => p.heat);
+  const minHeat = Math.min(...heats) * 0.9;
+  const maxHeat = Math.max(...heats) * 1.1;
+
+  ctx.fillStyle = '#12121f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#2a2a4a';
+  ctx.lineWidth = 0.5;
+  const heatStep = Math.max(1, Math.ceil((maxHeat - minHeat) / 4));
+  for (let h = Math.ceil(minHeat / heatStep) * heatStep; h <= maxHeat; h += heatStep) {
+    const y = pad.top + (1 - (h - minHeat) / (maxHeat - minHeat)) * chartH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = '#666';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(formatNumber(h), pad.left - 8, y + 4);
+  }
+
+  // X axis
+  ctx.textAlign = 'center';
+  const labelStep = Math.max(1, Math.floor(points.length / 6));
+  points.forEach((p, i) => {
+    if (i % labelStep === 0 || i === points.length - 1) {
+      const x = pad.left + (i / Math.max(1, points.length - 1)) * chartW;
+      ctx.fillStyle = '#666';
+      ctx.font = '10px monospace';
+      ctx.fillText(formatTime(p.ts), x, H - pad.bottom + 16);
+    }
+  });
+
+  // Draw heat line
+  ctx.beginPath();
+  ctx.strokeStyle = '#ffd740';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  points.forEach((p, i) => {
+    const x = pad.left + (i / Math.max(1, points.length - 1)) * chartW;
+    const y = pad.top + (1 - (p.heat - minHeat) / (maxHeat - minHeat)) * chartH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Gradient fill
+  const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
+  gradient.addColorStop(0, 'rgba(255,215,64,0.15)');
+  gradient.addColorStop(1, 'rgba(255,215,64,0.01)');
+  ctx.lineTo(pad.left + chartW, pad.top + chartH);
+  ctx.lineTo(pad.left, pad.top + chartH);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Dots
+  points.forEach((p, i) => {
+    const x = pad.left + (i / Math.max(1, points.length - 1)) * chartW;
+    const y = pad.top + (1 - (p.heat - minHeat) / (maxHeat - minHeat)) * chartH;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd740';
+    ctx.fill();
+  });
+
+  // Y axis label
+  ctx.save();
+  ctx.translate(14, pad.top + chartH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#888';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('热度', 0, 0);
+  ctx.restore();
+}
+
+// ============================================================
+// Auto Refresh
+// ============================================================
+function startRefreshTimer() {
+  refreshCountdown = REFRESH_INTERVAL;
+  updateTimerDisplay();
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    refreshCountdown--;
+    updateTimerDisplay();
+    if (refreshCountdown <= 0) {
+      refreshCountdown = REFRESH_INTERVAL;
+      refreshAll();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const el = $('#refreshTimer');
+  el.textContent = `${refreshCountdown}s 后刷新`;
+}
+
+async function refreshAll() {
+  refreshCountdown = REFRESH_INTERVAL;
+  updateTimerDisplay();
+
+  // Update connection status
+  const statusData = await apiGet('/api/status');
+  const dot = $('#statusDot');
+  const text = $('#statusText');
+  if (statusData) {
+    dot.classList.remove('offline');
+    text.textContent = '已连接';
+    text.style.color = '#00c853';
+  } else {
+    dot.classList.add('offline');
+    text.textContent = '未连接';
+    text.style.color = '#ff1744';
+  }
+
+  // Load active tab
+  const activeTab = document.querySelector('.tab-btn.active');
+  if (activeTab) loadTabData(activeTab.dataset.tab);
+}
+
+// ============================================================
+// Initialization
+// ============================================================
+async function init() {
+  startRefreshTimer();
+  await refreshAll();
+}
+
+init();
+</script>
+</body>
+</html>
